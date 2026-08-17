@@ -1,0 +1,21 @@
+name: substation-dnp3
+services:
+  dnp3master:
+    build: ./dnp3master
+    container_name: dnp3master
+    environment:
+      - OPENPLC_IP=${OPENPLC_IP}
+    ports:
+      - "5001:5001"
+    restart: unless-stopped
+
+  dnp3web:
+    build: ./dnp3web
+    container_name: dnp3web
+    environment:
+      - OPENPLC_IP=${OPENPLC_IP}
+    ports:
+      - "5000:5000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
