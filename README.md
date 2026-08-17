@@ -1,4 +1,5 @@
 # Substation Simulation — ICS/OT Security Lab
+
 A self-contained Industrial Control System (ICS) simulation of an electrical
 substation, built for security research and demonstration. It models a real
 OT environment — a PLC driving a substation process, a SCADA master polling it
