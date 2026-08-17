@@ -136,8 +136,8 @@ Once VM1 is running, the backup MUST be opened in an incognito tab and make sure
 Once VM2 is running:
 | Interface        | URL                        |
 |------------------|----------------------------|
-| DNP3 web frontend| http://localhost:5000      |
-| Tag API (JSON)   | http://localhost:5001/tags |
+| DNP3 web frontend| http://localhost:3000      |
+| Tag API (JSON)   | http://localhost:3001/tags |
 ---
 ## Architecture
 ```
