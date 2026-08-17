@@ -51,7 +51,7 @@ Once VM1 is running:
 | OpenPLC (primary)| http://localhost:8080      | openplc / openplc |
 | OpenPLC (backup) | http://localhost:8082      | openplc / openplc |
 | Node-RED         | http://localhost:1880      | —                 |
-| FUXA HMI         | http://localhost:1881      | admin / admin     |
+| FUXA HMI         | http://localhost:1881      | —                 |
 
 Once VM2 is running:
 
