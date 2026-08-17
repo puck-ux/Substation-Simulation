@@ -4,11 +4,15 @@ services:
     image: xyzsterx123/substation-openplc:latest
     container_name: openplc
     ports: ["502:502", "8080:8080", "20000:20000"]
+    volumes:
+      - ./openplc_persistent:/docker_persistent
     restart: unless-stopped
   openplc_backup:
     image: xyzsterx123/substation-openplc-backup:latest
     container_name: openplc_backup
     ports: ["504:502", "8082:8080", "20001:20000"]
+    volumes:
+      - ./openplc_backup_persistent:/docker_persistent
     restart: unless-stopped
   nodered:
     image: xyzsterx123/substation-nodered:latest
