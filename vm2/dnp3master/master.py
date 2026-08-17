@@ -18,7 +18,11 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-OPENPLC_IP      = "10.80.129.6"
+OPENPLC_IP = os.environ.get("OPENPLC_IP")
+if not OPENPLC_IP:
+    log.error("OPENPLC_IP environment variable is not set — "
+              "set it in the .env file (e.g. OPENPLC_IP=192.168.68.110) before starting.")
+    sys.exit(1)
 DNP3_PORT       = 20000
 MODBUS_PORT     = 502
 MASTER_ADDR     = 1
