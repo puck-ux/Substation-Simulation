@@ -1,4 +1,8 @@
+
 # Substation Simulation — ICS/OT Security Lab
+
+
+
 
 A self-contained Industrial Control System (ICS) simulation of an electrical
 substation, built for security research and demonstration. It models a real
@@ -9,6 +13,7 @@ of unauthenticated industrial protocols (Modbus, DNP3).
 The lab runs across two machines (VMs): **VM1** hosts the PLC and HMI layer,
 **VM2** hosts the SCADA master and web frontend. Each is brought up with a
 single Docker Compose command.
+
 ---
 ## Virtual Machine Setup
 
