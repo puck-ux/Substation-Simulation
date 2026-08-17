@@ -8,7 +8,7 @@ CORS(app)
 
 MODBUS_PORT = 502
 BACKUP_PORT = 504
-DNP3MASTER_URL = "http://172.17.0.2:5001"   # docker inspect dnp3master | grep IPAddress
+DNP3MASTER_URL = "http://dnp3master:5001"   # docker inspect dnp3master | grep IPAddress
 
 
 def get_client(ip, portinput):
