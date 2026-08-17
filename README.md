@@ -44,12 +44,12 @@ whatever IP VM1 has on your network, then bring it up.
 
 ## Access Points
 
-Once VM1 is running:
+Once VM1 is running, make sure to click start plc on both OpenPLCs:
 
 | Interface        | URL                        | Login             |
 |------------------|----------------------------|-------------------|
 | OpenPLC (primary)| http://localhost:8080      | openplc / openplc |
-| OpenPLC (backup) | http://localhost:8082      | openplc / openplc |
+| OpenPLC (backup) | http://localhost:8082      | openplc / openplc | (Must be opened in an incognito/private tab)
 | Node-RED         | http://localhost:1880      | —                 |
 | FUXA HMI         | http://localhost:1881      | —                 |
 
