@@ -1,42 +1,28 @@
 name: substation
 services:
   openplc:
-    image: openplc:v3
+    image: xyzsterx123/substation-openplc:latest
     container_name: openplc
-    ports:
-      - "502:502"
-      - "8080:8080"
-      - "20000:20000"
+    ports: ["502:502", "8080:8080", "20000:20000"]
     restart: unless-stopped
-
   openplc_backup:
-    image: openplc:v3
+    image: xyzsterx123/substation-openplc-backup:latest
     container_name: openplc_backup
-    ports:
-      - "504:502"
-      - "8082:8080"
-      - "20001:20000"
+    ports: ["504:502", "8082:8080", "20001:20000"]
     restart: unless-stopped
-
   nodered:
-    image: nodered/node-red
+    image: xyzsterx123/substation-nodered:latest
     container_name: nodered
-    ports:
-      - "1880:1880"
+    ports: ["1880:1880"]
     restart: unless-stopped
-
   mosquitto:
     image: eclipse-mosquitto
     container_name: mosquitto
-    ports:
-      - "1883:1883"
-    volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    ports: ["1883:1883"]
+    volumes: ["./mosquitto.conf:/mosquitto/config/mosquitto.conf"]
     restart: unless-stopped
-
   fuxa:
-    image: frangoteam/fuxa:latest
+    image: xyzsterx123/substation-fuxa:latest
     container_name: fuxa
-    ports:
-      - "1881:1881"
+    ports: ["1881:1881"]
     restart: unless-stopped
