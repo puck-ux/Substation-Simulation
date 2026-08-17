@@ -30,11 +30,22 @@ flows, and FUXA HMI project already configured — everything comes up running.
 ### VM2 — SCADA Master
 
 ```bash
-git clone https://github.com/puck-ux/Substation-Simulation.git
+# Prerequisites: Node.js/npm installed.
+# VM1 must already be running and reachable on the network.
+
 cd Substation-Simulation/vm2
+
+# Set VM1's IP
 cp .env.example .env
-# edit .env — set OPENPLC_IP to VM1's IP address
-docker compose up -d
+nano .env                        # OPENPLC_IP=<VM1's IP>
+
+# Backend (builds from source — first run takes a few minutes)
+docker compose up -d --build
+
+# Frontend (separate dev server on :3000)
+cd dnp3web/dnp3frontend
+npm install
+npm start
 ```
 
 VM2 needs to know VM1's address. Set `OPENPLC_IP` in the `.env` file to
