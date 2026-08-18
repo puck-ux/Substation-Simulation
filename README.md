@@ -37,7 +37,7 @@ Accounts required:
 
 ### Downloading the RHEL ISO
 1. Log into your developer account at https://developers.redhat.com/products/rhel/download
-2. Select Red Hat Enterprise Linux 9.6
+2. Select Red Hat Enterprise Linux 9.6 (x86_64)
 3. Download the Boot ISO (~800MB)
 
 ### Creating VM 1 — PLC/HMI
@@ -80,20 +80,18 @@ Log out and back in, then verify:
 docker --version
 docker compose version
 ```
+Install Git on the VM
+```bash
+sudo dnf install git
+```
+Power down the VM
 
 ### Creating VM 2 — DNP3 SCADA Master
-Repeat the same process to create the second VM:
-- Name: Substation-DNP3
-- RAM: 4096MB
-- CPU: 2 cores
-- Disk: 20GB dynamically allocated
-- Network: Bridged Adapter
+1. Right click VM 1 and click "clone"
+2. Rename it something like Substation-DNP3
+3. Choose "Generate new MAC addresses for all network adapters" under MAC Address Policy
+4. Click finish
 
-Install RHEL following the same steps as VM 1, then install Docker using the
-same commands above. VM 2 also needs Node.js for the web frontend:
-```bash
-sudo dnf install -y nodejs npm
-```
 ---
 ## Quick Start
 ### VM1 — PLC / HMI
