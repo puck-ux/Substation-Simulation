@@ -150,6 +150,20 @@ Once VM2 is running:
 |------------------|----------------------------|
 | DNP3 web frontend| http://localhost:3000      |
 | Tag API (JSON)   | http://localhost:3001/tags |
+### PLC
+![PLC](Screenshots/plc.PNG)
+
+### NodeRed
+![NodeRed](Screenshots/nodered.PNG)
+
+### HMI
+![HMI](Screenshots/HMI.PNG)
+
+### Backup PLC
+![backup_plc](Screenshots/backup_plc.PNG)
+
+### DNP3 Master
+![dnp3master](Screenshots/dnp3master.PNG)
 ---
 ## Architecture
 ```
