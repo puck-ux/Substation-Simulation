@@ -197,7 +197,88 @@ Once VM2 is running:
 | T1 Temp Alarm      | Binary input    | idx 1           |
 
 ---
-## Attacks
+# Attacks
+For this we will create a third VM with Debian
+
+## Attacker VM Setup (VM3 — Debian)
+
+The attack scripts run from a third VM on the same network segment as VM1 and
+VM2. This VM uses Debian and runs command-line only (no desktop).
+
+### Creating VM 3 — Attacker
+
+In VirtualBox click **New** and configure:
+
+- **Name:** Attacker
+- **ISO Image:** Debian 12 netinst ISO — [Download Here](https://cdimage.debian.org/cdimage/archive/12.12.0/amd64/iso-cd/debian-12.12.0-amd64-netinst.iso)
+- Leave "Proceed with Unattended Installation" unchecked or you will download the desktop version!
+- **RAM:** 2048MB
+- **CPU:** 2 cores
+- **Disk:** 20GB dynamically allocated
+- **Network:** Bridged Adapter (must be on the same network as VM1 and VM2)
+
+### Installing Debian
+
+The Debian installer has more steps than RHEL. Work through the screens in order:
+
+1. At the boot menu, select **Graphical Install**.
+2. **Language / Location / Keyboard** — select your language, country, and keyboard layout.
+3. **Network configuration:**
+   - It auto-configures via DHCP over the bridged adapter.
+   - **Hostname:** enter a name (e.g. `attacker`).
+   - **Domain name:** leave blank and continue.
+4. **Set up users and passwords:**
+   - **Root password:** set a root password (the attacks run as root).
+   - **Full name / username / password:** create your user account.
+5. **Clock / Timezone** — select your timezone.
+6. **Partition disks:**
+   - Select **Guided - use entire disk**.
+   - Choose the virtual disk.
+   - Select **All files in one partition**.
+   - Select **Finish partitioning and write changes to disk** → **Yes**.
+7. **Package manager** — accept the default Debian mirror, leave the proxy blank.
+8. **Software selection** — this screen has a checklist. Use the spacebar to
+   toggle options:
+   - **Untick** "Debian desktop environment" and all desktop options (GNOME, etc.).
+   - **Leave ticked** "SSH server" and "standard system utilities".
+   - This gives a minimal command-line install.
+9. **GRUB bootloader** — install to the primary drive (usually `/dev/sda`) when prompted.
+10. Wait for installation to complete, then **reboot** and remove the ISO.
+
+After reboot you land at a command-line login. Log in with the user you created.
+
+### Installing Dependencies
+
+A minimal Debian install is missing most tools the scripts need. Install them:
+
+```bash
+su -                                    # switch to root (or use sudo if configured)
+apt update
+apt install -y python3 python3-pip git curl iptables tcpdump libpcap-dev
+pip3 install scapy pymodbus --break-system-packages
+```
+
+> **Note:** Debian 12 requires the `--break-system-packages` flag for pip
+> installs. It also ships with `nftables` rather than `iptables` by default —
+> the `iptables` package above provides the `iptables` command the NFQUEUE-based
+> scripts use. `dhclient` is not installed; renew DHCP leases with
+> `sudo systemctl restart networking` or by bringing the interface down and up.
+
+### Running the Attacks
+
+Clone the repository and run the scripts as root (raw socket access requires it):
+
+```bash
+git clone https://github.com/puck-ux/Substation-Simulation.git
+cd Substation-Simulation/attacks
+sudo python3 arp_spoof.py
+```
+
+> **Note:** The attacker VM must be on the same L2 network segment as VM1 and
+> VM2 (bridged to the same adapter) for ARP spoofing and MITM attacks to work.
+> IP addresses are DHCP-assigned — check the target IPs with `ip addr` on each
+> VM and update the scripts' target variables accordingly.
+
 The `attacks/` folder contains proof-of-concept tooling demonstrating the
 security weaknesses of unauthenticated ICS protocols. **For use only against
 this isolated lab.**
