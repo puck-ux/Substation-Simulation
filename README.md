@@ -17,6 +17,13 @@ single Docker Compose command.
 ---
 ## Virtual Machine Setup
 
+### Note
+If at any point you run into the error "is not valid yet" after saving the machine state and reloading it later just run these commands to reset the machine's time
+```bash
+sudo systemctl restart chronyd
+sudo chronyc makestep
+```
+
 ### Overview
 This section covers deploying the substation simulation across two Red Hat
 Enterprise Linux (RHEL) virtual machines running in VirtualBox. VM 1 hosts the
@@ -80,9 +87,10 @@ Log out and back in, then verify:
 docker --version
 docker compose version
 ```
-Install Git on the VM
+Install Git and the repository on the VM
 ```bash
 sudo dnf install git
+git clone https://github.com/puck-ux/Substation-Simulation.git
 ```
 Power down the VM
 
@@ -96,7 +104,6 @@ Power down the VM
 ## Quick Start
 ### VM1 — PLC / HMI
 ```bash
-git clone https://github.com/puck-ux/Substation-Simulation.git
 cd Substation-Simulation/vm1
 docker compose pull
 docker compose up -d
@@ -112,12 +119,13 @@ switch networks; if VM2 stops connecting, re-check it here and update VM2's `.en
 
 ### VM2 — SCADA Master
 ```bash
-# Prerequisites: Node.js/npm installed.
 # VM1 must already be running and reachable on the network.
+sudo dnf install -y nodejs npm
 cd Substation-Simulation/vm2
 # Set VM1's IP
 cp .env.example .env
 nano .env                        # OPENPLC_IP=<VM1's IP>
+# exit it with ctrl + x then y
 # Backend (builds from source — first run takes a few minutes)
 docker compose up -d --build
 # Frontend (separate dev server on :3000)
@@ -145,14 +153,14 @@ Once VM2 is running:
 ---
 ## Architecture
 ```
-  VM1 — Substation-PLC                       VM2 — Substation-DNP3
- ┌──────────────────────────┐               ┌────────────────────────┐
+  VM1 — Substation-PLC                        VM2 — Substation-DNP3
+ ┌──────────────────────────┐                ┌────────────────────────┐
  │  OpenPLC (outstation)    │◄───DNP3 :20000─┤  dnp3master (SCADA)    │
  │  OpenPLC backup          │◄───Modbus :502─┤                        │
- │  Node-RED (Modbus→MQTT)  │               │  dnp3web (frontend)     │
- │  Mosquitto (MQTT broker) │               └────────────────────────┘
- │  FUXA (HMI)              │
- └──────────────────────────┘
+ │  Node-RED (Modbus→MQTT)  │                │  dnp3web (frontend)    │
+ │  Mosquitto (MQTT broker) │                └────────────────────────┘
+ │  FUXA (HMI)              │                      │
+ └──────────────────────────┘                      │
         bridged LAN ───────────────────────────────┘
 ```
 - **OpenPLC** runs the substation control logic as a DNP3 outstation and Modbus
