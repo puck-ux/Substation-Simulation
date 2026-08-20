@@ -28,7 +28,7 @@ MODBUS_PORT     = 502
 MASTER_ADDR     = 1
 OUTSTATION_ADDR = 10
 API_PORT        = 5001
-SCAN_INTERVAL_SECONDS = int(os.environ.get("SCAN_INTERVAL_SECONDS", "5"))
+SCAN_INTERVAL_SECONDS = int(os.environ.get("SCAN_INTERVAL_SECONDS", "1"))
 
 dnp3_tags = {
     "gauge":  "ERR",
