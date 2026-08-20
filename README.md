@@ -549,6 +549,104 @@ of the script to match your network, then:
 ```bash
 sudo python3 ids_monitor.py
 ```
+---
+### 4. Encrypted Tunnel (WireGuard) 
+
+<img src="Screenshots/wireguard.png" width="80">
+
+**What it does:** Establishes a WireGuard VPN tunnel between VM1 and VM2, giving
+each a fixed private tunnel IP (`10.10.0.1` and `10.10.0.2`). Traffic routed
+through the tunnel is encrypted and mutually authenticated by keypair — each
+peer only accepts traffic from a peer whose public key it holds. The DNP3 master
+is pointed at VM1's tunnel IP so its telemetry rides the encrypted path instead
+of the plaintext bridged LAN.
+
+**What it defeats:** The confidentiality and integrity attacks on the tunnelled
+traffic. Even with the attacker on-path via ARP spoofing, the DNP3 payload is
+unreadable (defeating the passive value logger) and unforgeable (defeating the
+DNP3 tamper) — altering a packet breaks its authentication, and the attacker
+cannot impersonate either endpoint without a valid key. As a bonus, the fixed
+tunnel IPs are independent of DHCP, so the master's target address no longer
+drifts when the network changes.
+
+**Run (on BOTH VM1 and VM2):**
+
+Install WireGuard and generate a keypair on each VM:
+```bash
+sudo dnf install -y wireguard-tools
+sudo sh -c 'wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey'
+```
+
+Create `/etc/wireguard/wg0.conf` on each VM. Each config uses its *own* private
+key and the *other* VM's public key, with the peer's bridged IP as the endpoint:
+
+VM1:
+```ini
+[Interface]
+Address = 10.10.0.1/24
+PrivateKey = <VM1_PRIVATE_KEY>
+ListenPort = 51820
+
+[Peer]
+PublicKey = <VM2_PUBLIC_KEY>
+AllowedIPs = 10.10.0.2/32
+Endpoint = <VM2_BRIDGED_IP>:51820
+PersistentKeepalive = 25
+```
+
+VM2:
+```ini
+[Interface]
+Address = 10.10.0.2/24
+PrivateKey = <VM2_PRIVATE_KEY>
+ListenPort = 51820
+
+[Peer]
+PublicKey = <VM1_PUBLIC_KEY>
+AllowedIPs = 10.10.0.1/32
+Endpoint = <VM1_BRIDGED_IP>:51820
+PersistentKeepalive = 25
+```
+
+Open the WireGuard port in the firewall on both VMs, then bring the tunnel up:
+```bash
+sudo firewall-cmd --add-port=51820/udp --permanent
+sudo firewall-cmd --reload
+sudo wg-quick up wg0
+```
+
+Finally, set VM2's `OPENPLC_IP` (in `vm2/.env`) to VM1's tunnel IP `10.10.0.1`
+so the DNP3 traffic uses the tunnel, and restart the master.
+
+**Verify:**
+```bash
+sudo wg show           # shows the peer and a "latest handshake" once traffic flows
+ping -c 3 10.10.0.1    # from VM2 — should reach VM1 over the tunnel
+```
+With the tunnel carrying the DNP3 traffic, run the passive listener or DNP3
+tamper from VM3 — both now fail, because the traffic on the wire is encrypted
+WireGuard packets rather than readable DNP3.
+
+**Stop:**
+```bash
+sudo wg-quick down wg0
+```
+
+> **Note:** WireGuard protects the *traffic routed through it*, and is the
+> strongest control for that traffic because it holds regardless of the
+> attacker's network position — unlike IP filtering (IP-spoofable) and static
+> ARP (which only removes the on-path prerequisite). It supersedes the stunnel
+> TLS tunnel and, because it tunnels whole protocols rather than a single port,
+> can also cover the Modbus control path if that traffic is routed through it.
+
+> **Limitation:** It secures confidentiality and integrity, not availability —
+> an on-path attacker can still drop the encrypted packets (the ARP-spoof
+> blackhole) or flood the PLC (DoS), because refusing to forward traffic does
+> not require reading it. It also protects the link, not the endpoints: a
+> compromised host remains compromised. Availability still depends on the other
+> controls (IP filtering, rate limiting, network segmentation).
+
+---
 
 **Stop:** Press **Ctrl+C**. Alerts are also appended to `ids_alerts.log`.
 
