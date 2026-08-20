@@ -472,6 +472,8 @@ while legitimate control from VM2 continues to work.
 **Run (on VM1):** Set `VM2_IP` at the top of the script to the master's real IP,
 then:
 ```bash
+# enter the defences folder
+cd Substation-Simulation/defences
 sudo bash harden_vm1.sh
 ```
 
