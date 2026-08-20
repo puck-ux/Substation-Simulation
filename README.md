@@ -264,15 +264,164 @@ pip3 install scapy pymodbus --break-system-packages
 > scripts use. `dhclient` is not installed; renew DHCP leases with
 > `sudo systemctl restart networking` or by bringing the interface down and up.
 
-### Running the Attacks
+### Setting Up the ENV File
 
-Clone the repository and run the scripts as root (raw socket access requires it):
+Clone the repository and edit the env file to contain VM 1 and VM 2's IPs and MAC addresses.
 
 ```bash
+# First grab VM 1 and VM 2 information by running ip addr show enp0s3 on both
 git clone https://github.com/puck-ux/Substation-Simulation.git
 cd Substation-Simulation/attacks
-sudo python3 arp_spoof.py
+cp targets.env.example targets.env
+nano targets.env   # fill in current VM1/VM2 IPs and MACs, save
 ```
+---
+## Running the Attacks
+
+### 1. Unauthenticated_Coil_Write.py
+
+**What it does:** Connects directly to the PLC over Modbus (port 502) and writes
+the breaker coil, flipping the substation switch. Because Modbus has no
+authentication, any host that can reach the port can issue the write — no
+credentials, bypassing the SCADA master and the operator entirely.
+
+**What it affects:** The `Substation_Switch` (coil 0) on the primary PLC. The
+breaker changes state; the change propagates out to the HMI and DNP3 frontend
+as if it were a legitimate command.
+
+**Run:**
+```bash
+sudo python3 Unauthenticated_Coil_Write.py
+```
+
+**Stop:** The script performs its write(s) and exits on its own. No cleanup
+required — it leaves no persistent rules or state.
+
+---
+
+### 2. breaker_override.py
+
+**What it does:** An escalation of the coil write into a sustained loss of
+control. It runs a loop that continuously forces the breaker to the open state,
+reading the coil back each cycle and re-opening it whenever the operator (or PLC
+logic) tries to close it. This reproduces the CRASHOVERRIDE / Industroyer
+behaviour — the operator can keep issuing close commands, but each is overridden
+within a second.
+
+**What it affects:** The `Substation_Switch` (coil 0). The breaker is held open;
+any operator attempt to re-close it is reversed. A counter of overridden
+re-close attempts is printed live as evidence.
+
+**Run:**
+```bash
+sudo python3 breaker_override.py
+```
+
+**Stop:** Press **Ctrl+C**. On exit the script restores the breaker to its
+closed state so the lab is left clean.
+
+---
+
+### 3. DOS_Attack.py
+
+**What it does:** Floods the PLC's Modbus port with a high volume of connection
+requests, exhausting its ability to service the legitimate master. Polling
+stalls and the HMI stops updating. In a failover setup the flood can be used to
+force a switchover to the backup PLC by making the primary unreachable.
+
+**What it affects:** Availability of the primary PLC — the SCADA master loses
+its connection and the operator loses visibility of the process.
+
+**Run:**
+```bash
+sudo python3 DOS_Attack.py
+```
+
+**Stop:** Press **Ctrl+C** to stop the flood. The PLC in most cases will have turned off so you must turn it on again from localhost:8080.
+
+---
+
+### 4. ARP_Spoof.py
+
+**What it does:** Sends forged ARP replies to VM1 and VM2, poisoning each one's
+ARP cache so both believe the attacker's MAC owns the other's IP. This places
+VM3 on-path (man-in-the-middle) between the master and the outstation. On its
+own — with IP forwarding disabled — it also acts as a silent blackhole,
+dropping the traffic between the two so the PLC appears to go offline.
+
+**What it affects:** All traffic between VM1 and VM2. It is the enabling
+condition for the DNP3 tampering (script 6) and, as a blackhole, denies
+availability with no attack traffic to detect.
+
+**Run:**
+```bash
+sudo python3 ARP_Spoof.py
+```
+
+**Stop:** Press **Ctrl+C**. The script sends corrective ARP replies on exit to
+restore both hosts' caches to the real MAC addresses. **Always stop it cleanly**
+— if it is killed without restoring, the two VMs keep routing through a
+non-existent path and traffic stays broken until the caches time out.
+
+---
+
+### 5. value_logger.py
+
+**What it does:** A passive, read-only listener. While ARP_Spoof.py has VM3
+on-path, it decodes the DNP3 and Modbus traffic flowing between the VMs and
+records every value it sees — logging process readings (voltage, current,
+winding temperature, etc.) and control commands in plaintext. It never modifies
+or holds a packet, so there is no risk of disrupting traffic.
+
+**What it affects:** Nothing — it only observes. It demonstrates the
+confidentiality weakness: the traffic is unencrypted and fully readable by
+anyone on the segment. Captured values are written to `captured_values.csv`.
+
+**Run:** (start ARP_Spoof.py first so there is traffic to observe)
+```bash
+sudo python3 value_logger.py
+```
+
+**Stop:** Press **Ctrl+C**. The CSV log is closed on exit. No cleanup needed.
+
+---
+
+### 6. dnp3_tamper.py
+
+**What it does:** The integrity attack. Building on the ARP-spoof MITM position,
+it intercepts DNP3 response traffic from the outstation to the master and
+rewrites a value in flight before forwarding it on — injecting a false
+transformer winding temperature (e.g. 300 °C) while the PLC's true state remains
+normal. The operator's HMI displays the fabricated reading; the PLC never saw
+it. The script recomputes the DNP3 CRC so the doctored packet is accepted as
+valid.
+
+**What it affects:** The `T1_WindingTemp_C` value shown on the HMI and frontend.
+The displayed value is false while the actual process value is unchanged.
+
+**Setup — requires NFQUEUE rules** so the traffic is passed to the script for
+inspection. Add them immediately before running:
+```bash
+sudo iptables -I FORWARD -p tcp --sport 20000 -j NFQUEUE --queue-num 0
+sudo iptables -I FORWARD -p tcp --dport 20000 -j NFQUEUE --queue-num 0
+```
+
+**Run:** (with ARP_Spoof.py already running)
+```bash
+sudo python3 dnp3_tamper.py
+```
+
+**Stop:** Press **Ctrl+C** to stop the script, then **immediately remove the
+NFQUEUE rules** — this is critical:
+```bash
+sudo iptables -D FORWARD -p tcp --sport 20000 -j NFQUEUE --queue-num 0
+sudo iptables -D FORWARD -p tcp --dport 20000 -j NFQUEUE --queue-num 0
+```
+
+> **Important:** The NFQUEUE rules drop traffic by default when no script is
+> bound to the queue. If you stop the script but leave the rules in place, all
+> DNP3 traffic between the VMs freezes. Always remove the rules the moment the
+> script stops.
 
 > **Note:** The attacker VM must be on the same L2 network segment as VM1 and
 > VM2 (bridged to the same adapter) for ARP spoofing and MITM attacks to work.
