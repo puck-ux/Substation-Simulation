@@ -85,7 +85,6 @@ sudo usermod -aG docker $USER
 Log out and back in, then verify:
 ```bash
 docker --version
-docker compose version
 ```
 Install Git and the repository on the VM
 ```bash
@@ -127,7 +126,7 @@ cp .env.example .env
 nano .env                        # OPENPLC_IP=<VM1's IP>
 # exit it with ctrl + x then y
 # Backend (builds from source — first run takes a few minutes)
-docker compose up -d --build
+sudo docker compose up -d --build
 # Frontend (separate dev server on :3000)
 cd dnp3web/dnp3frontend
 npm install
