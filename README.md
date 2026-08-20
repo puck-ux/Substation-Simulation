@@ -441,25 +441,126 @@ this isolated lab.**
 Each demonstrates a real ICS attack pattern. The DNP3 tampering and breaker
 override reproduce the class of manipulation seen in the CRASHOVERRIDE /
 Industroyer grid attack.
+
 ---
-## Defences
-The `defences/` folder contains the hardening measures, each defeating specific
-attacks above:
-- **IP filtering** (`harden_vm1.sh`) — restricts Modbus port 502 to the
-  legitimate master's IP via the Docker `DOCKER-USER` iptables chain. Defeats
-  the unauthenticated coil write and breaker override.
-- **Static ARP entries** — pins each host's peer to its known-good MAC,
-  defeating ARP spoofing and, by extension, the DNP3 tampering that depends on
-  the MITM position.
-- **IDS monitor** (`ids_monitor.py`) — detects ARP MAC changes, unauthorized
-  Modbus writes, and physically implausible value jumps.
-- **TLS tunnel** (stunnel) — wraps DNP3 traffic in mutually-authenticated TLS,
-  making it unreadable and unforgeable on the wire regardless of network
-  position. The strongest mitigation.
-Each defence's limitations are documented — IP filtering is spoofable, static
-ARP is a host-level control that does not survive reboot, and both are
-superseded by the cryptographic guarantees of the TLS tunnel.
+# Defences
+
+The attacks above all exploit the same root weakness: the industrial protocols
+in use (Modbus, DNP3) were designed for isolated, trusted networks and provide
+no authentication and no encryption. The defences here are layered controls that
+address different parts of that weakness — restricting who can reach the PLC,
+protecting the integrity of the network path, and detecting attacks that get
+through. Each is applied on the defender side (VM1 and VM2), not the attacker.
+
+Each defence counters specific attacks, and each has documented limitations —
+none is a complete cure on its own, which is why they are layered.
+
+Run each defence while there are no attacks running, especially ARP_Spoof.py
+
 ---
+
+### 1. IP Filtering (`harden_vm1.sh`)
+
+**What it does:** Restricts the PLC's Modbus port (502) so that only the
+legitimate SCADA master (VM2) may connect. Any Modbus write from another host
+is dropped at the PLC.
+
+**What it defeats:** The unauthenticated coil write and the breaker override —
+both reach the PLC directly over Modbus, so filtering the source blocks them
+while legitimate control from VM2 continues to work.
+
+**Run (on VM1):** Set `VM2_IP` at the top of the script to the master's real IP,
+then:
+```bash
+sudo bash harden_vm1.sh
+```
+
+**Verify:**
+```bash
+sudo iptables -L DOCKER-USER -n -v
+```
+Run an attack from VM3 — the DROP rule's packet counter should climb while the
+ACCEPT counter shows the legitimate master's traffic passing.
+
+> **Note:** OpenPLC runs in a Docker container, so the rule is placed in the
+> `DOCKER-USER` chain, not `INPUT`. Container-bound traffic bypasses `INPUT`
+> entirely — an `INPUT` rule would silently have no effect.
+
+> **Limitation:** Source IP addresses can be spoofed, so this is a mitigation,
+> not a cure. It also does not defend against an attack from a compromised
+> legitimate host. The stronger control is authenticated, encrypted transport
+> (see the TLS tunnel).
+
+---
+
+### 2. Static ARP Entries (`set_static_arp.sh`)
+
+**What it does:** Pins each host's view of its peer to the peer's known-good MAC
+address, so forged ARP replies are ignored and the attacker cannot insert itself
+into the traffic path.
+
+**What it defeats:** ARP spoofing, and by extension the DNP3 tampering and the
+MITM blackhole — all of which depend on the attacker holding the
+man-in-the-middle position. Remove that position and they collapse.
+
+**Run (on BOTH VM1 and VM2):** With the ARP spoof stopped (so you capture real
+MACs, not the attacker's), set `PEER_IP`/`PEER_MAC` to the *other* VM's values,
+then:
+```bash
+sudo bash set_static_arp.sh
+```
+
+**Verify:**
+```bash
+ip neigh show <peer_ip>
+```
+The entry should read `PERMANENT`. With the spoof running, re-check — the MAC
+should stay the real one and not flip to the attacker's.
+
+> **Important:** This must be applied on **both** VMs. Pinning only one side
+> leaves the other's cache poisonable and the attack still works.
+
+> **Limitation:** A host-level control against one specific technique. It does
+> not survive a reboot unless persisted, and can be bypassed by MAC cloning or
+> by attacks below the ARP layer (e.g. switch CAM-table flooding). The
+> equivalent production control is switch-enforced Dynamic ARP Inspection with
+> DHCP snooping, which requires managed switch hardware not present in this lab.
+
+---
+
+### 3. Intrusion Detection (`ids_monitor.py`)
+
+**What it does:** A passive, host-based IDS run on the defender side. It watches
+for three attack signatures at once: a change in a trusted peer's MAC address
+(ARP spoofing), a Modbus write from a non-whitelisted source (unauthorized
+control), and a physically implausible jump in a process value (e.g. winding
+temperature leaping from 87 to 300 in one poll — in-flight tampering). Alerts
+are printed and logged.
+
+**What it defeats:** It does not block attacks — it detects them. It is the
+"detect" layer that complements the "prevent" controls above. The
+plausibility check is notable: it catches the tampering attack even if an
+attacker somehow bypasses the ARP and TLS defences, because it reasons about
+whether the *value* is physically possible rather than about the network path.
+
+**Run (on VM1 or VM2):** Set the peer IP/MAC and legitimate master IP at the top
+of the script to match your network, then:
+```bash
+sudo python3 ids_monitor.py
+```
+
+**Stop:** Press **Ctrl+C**. Alerts are also appended to `ids_alerts.log`.
+
+To demonstrate it, run each attack from VM3 while it is monitoring — the ARP
+spoof, an unauthorized coil write, and the DNP3 tamper should each trigger their
+respective alert in real time.
+
+> **Note:** The physical-plausibility thresholds are illustrative lab values,
+> not engineering-validated limits — a real deployment would derive them from
+> the process's actual physical characteristics.
+
+---
+
 ## Requirements
 - Docker and Docker Compose
 - Two hosts (physical or VM) on the same network for the full two-VM setup;
